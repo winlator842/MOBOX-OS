@@ -96,6 +96,7 @@ DATA_SEG equ 0x10
 times 510-($-
 $$
 ) db 0
+) db 0
 ; 引导签名（0x55AA）
 dw 0xaa55
 
