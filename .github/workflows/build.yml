@@ -1,4 +1,7 @@
+name: Build MOBOX OS
+
 on: [push, pull_request]
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -14,7 +17,8 @@ jobs:
         run: nasm -f bin boot.asm -o boot.bin
 
       - name: Build kernel
-        run: clang --target=i386 -ffreestanding -fno-stack-protector -nostdlib -c kernel.c -o kernel.o
+        run: |
+          clang --target=i386 -ffreestanding -fno-stack-protector -nostdlib -c kernel.c -o kernel.o
 
       - name: Link kernel
         run: ld -m elf_i386 -T link.ld -o kernel.bin kernel.o
@@ -24,7 +28,7 @@ jobs:
 
       - name: Test with QEMU
         run: |
-          timeout 5 qemu-system-i386 -drive format=raw,file=mobox_os.img -no-reboot 2>&1 || true
+          timeout 5 qemu-system-i386 -drive format=raw,file=mobox_os.img -no-reboot -display none -serial stdio 2>&1 || true
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
