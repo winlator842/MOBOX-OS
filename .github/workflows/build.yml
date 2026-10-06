@@ -1,0 +1,35 @@
+name: Build MOBOX OS
+
+on: [push, pull_request]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Install tools
+        run: |
+          sudo apt update
+          sudo apt install nasm clang binutils -y
+      
+      - name: Build boot.bin
+        run: nasm -f bin boot.asm -o boot.bin
+      
+      - name: Build kernel.o
+        run: clang -ffreestanding -nostdlib -m32 -c kernel.c -o kernel.o
+      
+      - name: Link kernel
+        run: ld -m elf_i386 -T link.ld -nostdlib kernel.o -o kernel.bin
+      
+      - name: Create mobox_os.img
+        run: cat boot.bin kernel.bin > mobox_os.img
+      
+      - name: Upload img
+        uses: actions/upload-artifact@v4
+        with:
+          name: mobox_os
+          path: mobox_os.img
+          retention-days: 14
