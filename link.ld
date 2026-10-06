@@ -1,23 +1,22 @@
-/* MOBOX OS 链接器脚本 */
-/* 内核加载到物理地址 0x10000（64KB处） */
-
 ENTRY(kernel_entry)
 
-SECTIONS {
+SECTIONS
+{
     . = 0x10000;
 
-    .text : ALIGN(4) {
+    .text : {
         *(.text)
+    }
+
+    .rodata : {
         *(.rodata)
     }
 
-    .data : ALIGN(4) {
+    .data : {
         *(.data)
     }
 
-    .bss : ALIGN(4) {
+    .bss : {
         *(.bss)
     }
-
-    _end = .;
 }
