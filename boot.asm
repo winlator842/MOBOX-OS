@@ -1,6 +1,6 @@
 ; ============================================================
 ; MOBOX OS Bootloader
-; 512字节引导扇区，从实模式切换到32位保护模式，跳转到C内核
+; 512字节引导扇区，从实模式切换到32位保护模式
 ; ============================================================
 
 [org 0x7C00]
@@ -9,7 +9,7 @@
 ; ============================================
 ; 引导扇区入口
 ; ============================================
-cli                    ; 关中断
+cli
 xor ax, ax
 xor bx, bx
 xor cx, cx
@@ -18,22 +18,22 @@ mov ss, ax
 mov ds, ax
 mov es, ax
 mov sp, 0x7C00
-sti                    ; 开中断
+sti
 
 ; ============================================
 ; 读内核到内存
 ; 从软盘第2扇区开始，读10个扇区到 0x10000
 ; ============================================
-mov ah, 0x02           ; 读磁盘
-mov al, 10             ; 读10个扇区
-mov ch, 0              ; 磁道0
-mov cl, 2              ; 扇区2
-mov dh, 0              ; 磁头0
-mov dl, 0x00           ; 驱动器0
-mov bx, 0x0000         ; 偏移
-mov ax, 0x1000         ; 段地址
+mov ah, 0x02
+mov al, 10
+mov ch, 0
+mov cl, 2
+mov dh, 0
+mov dl, 0x00
+mov bx, 0x0000
+mov ax, 0x1000
 mov es, ax
-int 0x13               ; BIOS磁盘中断
+int 0x13
 
 jc disk_error
 test ah, ah
@@ -59,7 +59,7 @@ mov ds, ax
 mov ss, ax
 mov es, ax
 mov esp, 0x1FFFF
-jmp kernel_entry
+jmp 0x10000
 
 ; ============================================
 ; 死循环（磁盘错误时用）
@@ -90,17 +90,14 @@ dw 0xAA55
 ; GDT（全局描述符表）
 ; ============================================
 gdt_start:
-; NULL描述符
 dd 0x0
 dd 0x0
-; 代码段描述符
 dw 0xFFFF
 dw 0x0
 db 0x0
 db 10011010b
 db 11001111b
 db 0x0
-; 数据段描述符
 dw 0xFFFF
 dw 0x0
 db 0x0
@@ -115,25 +112,3 @@ dd gdt_start
 
 CODE_SEG equ 0x08
 DATA_SEG equ 0x10
-
-; ============================================
-; 32位内核入口
-; ============================================
-[bits 32]
-kernel_entry:
-mov ax, DATA_SEG
-mov ds, ax
-mov es, ax
-mov fs, ax
-mov gs, ax
-mov ss, ax
-mov esp, 0x1FFFF
-
-; 跳转到C内核
-extern kernel_main
-call kernel_main
-
-; 死循环
-.hang:
-hlt
-jmp .hang
