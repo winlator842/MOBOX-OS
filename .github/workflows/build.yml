@@ -42,6 +42,10 @@ jobs:
         run: |
           xxd boot.bin | tail -1
 
+      - name: Test IMG with QEMU
+        run: |
+          timeout 5 qemu-system-i386 -drive format=raw,file=mobox_os.img -no-reboot -display none -serial stdio 2>&1 || true
+
       - name: Test ISO with QEMU
         run: |
           timeout 5 qemu-system-i386 -cdrom mobox_os.iso -no-reboot -display none -serial stdio 2>&1 || true
