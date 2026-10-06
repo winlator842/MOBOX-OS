@@ -3,157 +3,97 @@
 #define VGA_BUFFER 0xB8000
 #define VGA_WIDTH 80
 #define VGA_HEIGHT 25
-#define VGA_COLOR 0x0A
+#define VGA_COLOR 0x0F
 
-static size_t terminal_row = 0;
-static size_t terminal_column = 0;
-static uint16_t* vga_buffer = (uint16_t*)VGA_BUFFER;
+struct vga_char {
+    uint8_t character;
+    uint8_t color;
+};
 
-void terminal_clear(void) {
-    size_t i;
-    for (i = 0; i < VGA_WIDTH * VGA_HEIGHT; i++;) {
-        vga_buffer[i] = (VGA_COLOR << 8) | ' ';
-    }
-    terminal_row = 0;
-    terminal_column = 0;
-}
+static struct vga_char *vga_buffer = (struct vga_char *)VGA_BUFFER;
+static int cursor_row = 0;
+static int cursor_col = 0;
 
-void terminal_scroll(void) {
-    size_t i;
-    while (i < (VGA_HEIGHT - 1) * VGA_WIDTH) {
-        vga_buffer[i] = vga_buffer[i + VGA_WIDTH];
-    }
+static void terminal_clear(void) {
+    int i = 0;
     while (i < VGA_WIDTH * VGA_HEIGHT) {
-        vga_buffer[i] = (VGA_COLOR << 8) | ' ';
+        vga_buffer[i].character = ' ';
+        vga_buffer[i].color = VGA_COLOR;
+        i++;
     }
-    terminal_row = VGA_HEIGHT - 1;
+    cursor_row = 0;
+    cursor_col = 0;
 }
 
-void terminal_putc(char c) {
-    size_t index;
-    
-    if (c == '\n') {
-        terminal_column = 0;
-        terminal_row++;
-        if (terminal_row >= VGA_HEIGHT) {
-            terminal_scroll();
-        }
-        return;
-    }
-
-    if (c == '\r') {
-        terminal_column = 0;
-        return;
-    }
-
-    if (c == '\t') {
-        terminal_column = (terminal_column + 8) & ~7;
-        if (terminal_column >= VGA_WIDTH) {
-            terminal_column = 0;
-            terminal_row++;
-        }
-        if (terminal_row >= VGA_HEIGHT) {
-            terminal_scroll();
-        }
-        return;
-    }
-
-    if (c == '\b') {
-        if (terminal_column > 0) {
-            terminal_column--;
-            index = terminal_row * VGA_WIDTH + terminal_column;
-            vga_buffer[index] = (VGA_COLOR << 8) | ' ';
-        }
-        return;
-    }
-
-    if (c >= ' ' && c <= '~') {
-        index = terminal_row * VGA_WIDTH + terminal_column;
-        vga_buffer[index] = (VGA_COLOR << 8) | (uint8_t)c;
-        terminal_column++;
-
-        if (terminal_column >= VGA_WIDTH) {
-            terminal_column = 0;
-            terminal_row++;
-            if (terminal_row >= VGA_HEIGHT) {
-                terminal_scroll();
+static void terminal_newline(void) {
+    int i, j;
+    cursor_col = 0;
+    cursor_row++;
+    if (cursor_row >= VGA_HEIGHT) {
+        i = 0;
+        while (i < VGA_HEIGHT - 1) {
+            j = 0;
+            while (j < VGA_WIDTH) {
+                vga_buffer[i * VGA_WIDTH + j] = vga_buffer[(i + 1) * VGA_WIDTH + j];
+                j++;
             }
+            i++;
+        }
+        j = 0;
+        while (j < VGA_WIDTH) {
+            vga_buffer[(VGA_HEIGHT - 1) * VGA_WIDTH + j].character = ' ';
+            vga_buffer[(VGA_HEIGHT - 1) * VGA_WIDTH + j].color = VGA_COLOR;
+            j++;
+        }
+        cursor_row = VGA_HEIGHT - 1;
+    }
+}
+
+static void terminal_putc(char c) {
+    if (c == '\n') {
+        terminal_newline();
+    } else if (c == '\r') {
+        cursor_col = 0;
+    } else if (c == '\t') {
+        cursor_col = (cursor_col + 8) & ~7;
+        if (cursor_col >= VGA_WIDTH) {
+            terminal_newline();
+        }
+    } else if (c == '\b') {
+        if (cursor_col > 0) {
+            cursor_col--;
+            vga_buffer[cursor_row * VGA_WIDTH + cursor_col].character = ' ';
+        }
+    } else {
+        vga_buffer[cursor_row * VGA_WIDTH + cursor_col].character = c;
+        vga_buffer[cursor_row * VGA_WIDTH + cursor_col].color = VGA_COLOR;
+        cursor_col++;
+        if (cursor_col >= VGA_WIDTH) {
+            terminal_newline();
         }
     }
 }
 
-void terminal_write(const char* str) {
-    while (*str != '\0') {
+static void terminal_write(const char *str) {
+    while (*str) {
         terminal_putc(*str);
         str++;
     }
 }
 
-void terminal_write_line(void) {
-    terminal_write("------------------------------------------\n");
-}
-
-void terminal_write_num(unsigned int num) {
-    int i;
-    char buf[12];
-    
-    if (num == 0) {
-        terminal_putc('0');
-        return;
-    }
-    i = 0;
-    while (num > 0) {
-        buf[i++;] = '0' + (num % 10);
-        num /= 10;
-    }
-    while (i > 0) {
-        terminal_putc(buf[--i]);
-    }
-}
-
-void print_banner(void) {
-    terminal_write("\n");
-    terminal_write("+==========================================+\n");
-    terminal_write("|          M O B O X   O S                 |\n");
-    terminal_write("|       x86 32-bit Operating System        |\n");
-    terminal_write("|            Version 0.1 Alpha             |\n");
-    terminal_write("+==========================================+\n\n");
-}
-
-void print_sysinfo(void) {
-    terminal_write("Initialization Report\n");
-    terminal_write_line();
-    terminal_write("  Kernel loaded at:  0x10000\n");
-    terminal_write("  Video mode:        VGA Text 80x25\n");
-    terminal_write("  Color scheme:      Black bg, Green text\n");
-    terminal_write("  Boot device:       Floppy / Virtual Disk\n");
-    terminal_write("  CPU mode:          32-bit Protected Mode\n");
-    terminal_write_line();
-}
-
-void kernel_main(void) {
+void kernel_entry(void) {
     terminal_clear();
-    print_banner();
-    terminal_write("Copyright (C) 2026 MOBOX Foundation.\n");
-    terminal_write("Licensed under GNU GPL v3.0\n\n");
-
-    print_sysinfo();
-
-    terminal_write("System initialized successfully.\n");
-    terminal_write("Welcome to MOBOX OS!\n\n");
-
-    terminal_write_line();
-    terminal_write("Demo Output:\n");
-    terminal_write("  String: ");
-    terminal_write("Hello from MOBOX OS!\n");
-    terminal_write("  Number: ");
-    terminal_write_num(2026);
-    terminal_write("\n");
-    terminal_write_line();
-
-    terminal_write("Press any key to continue... (not implemented yet)\n");
-
+    
+    terminal_write("========================================\n");
+    terminal_write("       MOBOX OS v0.1 booting...\n");
+    terminal_write("       Welcome to MOBOX OS!\n");
+    terminal_write("========================================\n\n");
+    terminal_write("MOBOX OS kernel loaded successfully!\n");
+    terminal_write("VGA text mode: 80x25, color enabled\n");
+    terminal_write("Memory: Protected mode 32-bit\n\n");
+    terminal_write("System ready.\n");
+    
     while (1) {
-        __asm__ volatile ("hlt");
+        __asm__ __volatile__("hlt");
     }
 }
