@@ -3,20 +3,18 @@ ENTRY(kernel_entry)
 SECTIONS
 {
     . = 0x10000;
-
-    .text : {
-        *(.text)
+    .text : ALIGN(4)
+    {
+        *(.text*)
+        *(.rodata*)
     }
-
-    .rodata : {
-        *(.rodata)
+    .data : ALIGN(4)
+    {
+        *(.data*)
     }
-
-    .data : {
-        *(.data)
-    }
-
-    .bss : {
-        *(.bss)
+    .bss : ALIGN(4)
+    {
+        *(COMMON)
+        *(.bss*)
     }
 }
