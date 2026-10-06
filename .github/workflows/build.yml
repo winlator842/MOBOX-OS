@@ -11,7 +11,7 @@ jobs:
       - name: Install tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y nasm clang llvm qemu-system-x86
+          sudo apt-get install -y nasm clang llvm qemu-system-x86 xorriso
 
       - name: Build bootloader
         run: nasm -f bin boot.asm -o boot.bin
@@ -26,13 +26,31 @@ jobs:
       - name: Create disk image
         run: cat boot.bin kernel.bin > mobox_os.img
 
-      - name: Test with QEMU
+      - name: Create bootable ISO
         run: |
-          timeout 5 qemu-system-i386 -drive format=raw,file=mobox_os.img -no-reboot -display none -serial stdio 2>&1 || true
+          mkdir -p iso_root
+          cp mobox_os.img iso_root/mobox_os.img
+          xorriso -as mkisofs \
+            -o mobox_os.iso \
+            -b mobox_os.img \
+            -no-emul-boot \
+            -boot-load-size 1 \
+            -boot-info-table \
+            iso_root
+
+      - name: Verify boot signature
+        run: |
+          xxd boot.bin | tail -1
+
+      - name: Test ISO with QEMU
+        run: |
+          timeout 5 qemu-system-i386 -cdrom mobox_os.iso -no-reboot -display none -serial stdio 2>&1 || true
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: mobox_os
-          path: mobox_os.img
+          path: |
+            mobox_os.img
+            mobox_os.iso
           retention-days: 14
